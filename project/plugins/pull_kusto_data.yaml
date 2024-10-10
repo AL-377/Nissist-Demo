@@ -1,0 +1,31 @@
+name: pull_kusto_data
+enabled: true
+required: false
+description: >-
+    pull_kusto_data function can execute Kusto query, pull data from Kusto and returns a DataFrame.
+examples:
+    df, description = pull_kusto_data(query)
+
+parameters:
+  - name: kusto_query
+    type: string
+    required: true
+    description: >-
+        The Kusto query to be executed.
+
+returns:
+  - name: df
+    type: DataFrame
+    description: >-
+        This DataFrame contains the result of the Kusto query.
+  - name: description
+    type: str
+    description: >-
+        This is a string describing the result of the Kusto query.
+
+configurations:
+    connection: 
+    database: 
+    aad_app_id: 
+    app_key: 
+    authority_id: 

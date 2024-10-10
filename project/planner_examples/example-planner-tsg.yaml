@@ -1,0 +1,124 @@
+enabled: True
+rounds:
+  - user_query: diagnose the incident happened in nodeId 12345, time ranging from 2024-01-01 to 2024-01-31
+    state: created
+    post_list:
+      - message: diagnose the incident happened in nodeId 12345, time ranging from 2024-01-01 to 2024-01-31
+        send_from: User
+        send_to: Planner
+        attachment_list:
+      - message: Please provide the first troubleshooting step for the incident happened in nodeId 12345, time ranging from 2024-01-01 to 2024-01-31
+        send_from: Planner
+        send_to: TSGCopilot
+        attachment_list:
+        - type: init_plan
+          content: |-
+                1. Get the first troubleshooting step from TSGCopilot for the incident happened in nodeId 12345, time ranging from 2024-01-01 to 2024-01-31
+                2. Carry out the first troubleshooting step <interactively depends on 1>
+                3. Decide the next troubleshooting step to be conducted <interactively depends on 2>
+                4. Get the next troubleshooting step from TSGCopilot <interactively depends on 3>
+                5. Repeat steps 2-4 until the no more troubleshooting step is needed, finally report to user <interactively depends on 3>
+        - type: plan
+          content: |-
+                1. Get the first troubleshooting step from TSGCopilot for the incident happened in nodeId 12345, time ranging from 2024-01-01 to 2024-01-31
+                2. Carry out the first troubleshooting step
+                3. Decide the next troubleshooting step to be conducted
+                4. Get the next troubleshooting step from TSGCopilot
+                5. Repeat steps 2-4 until the no more troubleshooting step is needed, finally report to user
+        - type: current_plan_step
+          content: 1. Get the first troubleshooting step from TSGCopilot for the incident happened in nodeId 12345, time ranging from 2024-01-01 to 2024-01-31
+      - message: To diagnose the incident happened in nodeId 12345, you need first to execute Kusto query below
+                 ```Kusto
+                  let start = datetime(2024-01-01);
+                  let end = datetime(2024-01-31);
+                  let nodeId = 12345;
+                  nodeIncident
+                  | where NodeId == nodeId
+                  | where TimeGenerated >= start and TimeGenerated <= end
+                  | project TimeGenerated, NodeId, isAvailable
+                  ```
+                  Then check the "isAvailable" field in the result to see if the incident happened in nodeId 12345 is available in the time range from 2024-01-01 to 2024-01-31
+                  If there is any record with "isAvailable" field equals to "false", triage the incident to Team A.
+                  If there is no record with "isAvailable" field equals to "false", triage the incident to Team B.
+        send_from: TSGCopilot
+        send_to: Planner
+        attachment_list:
+      - message: Execute the following Kusto query to diagnose the incident happened in nodeId 12345
+                 ```Kusto
+                  let start = datetime(2024-01-01);
+                  let end = datetime(2024-01-31);
+                  let nodeId = 12345;
+                  nodeIncident
+                  | where NodeId == nodeId
+                  | where TimeGenerated >= start and TimeGenerated <= end
+                  | project TimeGenerated, NodeId, isAvailable
+                  ```
+        send_from: Planner
+        send_to: CodeInterpreter
+        attachment_list:
+          - type: init_plan
+            content: |-
+                1. Get the first troubleshooting step from TSGCopilot for the incident happened in nodeId 12345, time ranging from 2024-01-01 to 2024-01-31
+                2. Carry out the first troubleshooting step <interactively depends on 1>
+                3. Decide the next troubleshooting step to be conducted <interactively depends on 2>
+                4. Get the next troubleshooting step from TSGCopilot <interactively depends on 3>
+                5. Repeat steps 2-4 until the no more troubleshooting step is needed, finally report to user <interactively depends on 3>
+          - type: plan
+            content: |-
+                1. Get the first troubleshooting step from TSGCopilot for the incident happened in nodeId 12345, time ranging from 2024-01-01 to 2024-01-31
+                2. Carry out the first troubleshooting step
+                3. Decide the next troubleshooting step to be conducted
+                4. Get the next troubleshooting step from TSGCopilot
+                5. Repeat steps 2-4 until the no more troubleshooting step is needed, finally report to user
+          - type: current_plan_step
+            content: 2. Carry out the first troubleshooting step <interactively depends on 1>
+      - message: I queried the data from Kusto in the time range from 2024-01-01 to 2024-01-31
+        send_from: CodeInterpreter
+        send_to: Planner
+        attachment_list:
+      - message: Given the queried data, please check the "isAvailable" field.
+                 If there is any record with "isAvailable" field equals to "false", triage the incident to Team A.
+                 If there is no record with "isAvailable" field equals to "false", triage the incident to Team B.
+        send_from: Planner
+        send_to: CodeInterpreter
+        attachment_list:
+        - type: init_plan
+          content: |-
+                1. Get the first troubleshooting step from TSGCopilot for the incident happened in nodeId 12345, time ranging from 2024-01-01 to 2024-01-31
+                2. Carry out the first troubleshooting step <interactively depends on 1>
+                3. Decide the next troubleshooting step to be conducted <interactively depends on 2>
+                4. Get the next troubleshooting step from TSGCopilot <interactively depends on 3>
+                5. Repeat steps 2-4 until the no more troubleshooting step is needed, finally report to user  <interactively depends on 3>
+        - type: plan
+          content: |-
+                1. Get the first troubleshooting step from TSGCopilot for the incident happened in nodeId 12345, time ranging from 2024-01-01 to 2024-01-31
+                2. Carry out the first troubleshooting step
+                3. Decide the next troubleshooting step to be conducted
+                4. Get the next troubleshooting step from TSGCopilot
+                5. Repeat steps 2-4 until the no more troubleshooting step is needed, finally report to user
+        - type: current_plan_step
+          content: 3. Decide the next troubleshooting step to be conducted <interactively depends on 2>
+      - message: I just checked the "isAvailable" field in the queried data and found that there is no record with "isAvailable" field equals to "false". I will triage the incident to Team B. No more troubleshooting step is needed.
+        send_from: CodeInterpreter
+        send_to: Planner
+        attachment_list:
+      - message: The incident happened in nodeId 12345 is triaged to Team B because there is no record with "isAvailable" field equals to "false"
+        send_from: Planner
+        send_to: User
+        attachment_list:
+          - type: init_plan
+            content: |-
+                  1. Get the first troubleshooting step from TSGCopilot for the incident happened in nodeId 12345, time ranging from 2024-01-01 to 2024-01-31
+                  2. Carry out the first troubleshooting step <interactively depends on 1>
+                  3. Decide the next troubleshooting step to be conducted <interactively depends on 2>
+                  4. Get the next troubleshooting step from TSGCopilot <interactively depends on 3>
+                  5. Repeat steps 2-4 until the no more troubleshooting step is needed, finally report to user  <interactively depends on 3>
+          - type: plan
+            content: |-
+                  1. Get the first troubleshooting step from TSGCopilot for the incident happened in nodeId 12345, time ranging from 2024-01-01 to 2024-01-31
+                  2. Carry out the first troubleshooting step
+                  3. Decide the next troubleshooting step to be conducted
+                  4. Get the next troubleshooting step from TSGCopilot
+                  5. Repeat steps 2-4 until the no more troubleshooting step is needed, finally report to user
+          - type: current_plan_step
+            content: 5. Repeat steps 2-4 until the no more troubleshooting step is needed, finally report to user

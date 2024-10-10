@@ -1,0 +1,11 @@
+alias: TSGCopilot
+module: taskweaver.ext_role.tsg_copilot.tsg_copilot.TSGCopilot
+intro : |-
+  TSGCopilot could help Planner to investigate the incidents in cloud system.
+  It can retrieve the troubleshooting guide from the knowledge base.
+  Planner should replace the plan with the troubleshooting guide provided by TSGCopilot.
+  Planner should carry out the troubleshooting guide, including:
+    - Query the data
+    - Examine the queried data
+  When finished the current troubleshooting guide, Planner should review the results and decide the next troubleshooting guide to be asked to TSGCopilot.
+  This process should be repeated until the no more troubleshooting guide is needed. Before the process ends, Planner should not talk to User.

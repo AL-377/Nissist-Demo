@@ -1,0 +1,70 @@
+[
+    {
+        "#type#": "terminology",
+        "#title#": "How to Investigate NSM to RNM Connection Incident",
+        "#intent#": "What is NSM to RNM connection?",
+        "#action#": "NSM, as a cluster-level service, maintains a pool of connections to RNM in the region for executing pull tasks (for instance, pull VNET, NIC, ACLs, etc.). In order to keep those connections alive and also for heartbeat purpose, NSM periodically send an \"Echo\" request to RNM endpoint. Since the request simply returns a string without any involvement of the backend partition, it is supposed to work as long as the network connectivity from NSM to RNM gateway is alive. If the request fails, it indicates the connectivity does not work and the pull task execution may be impacted, which have direct customer impact. When the failure count reaches the predefined threshold, an incident will be created.",
+        "#output#": "",
+        "#default_parameters#": {}
+    },
+    {
+        "#type#": "background",
+        "#title#": "How to Investigate NSM to RNM Connection Incident",
+        "#intent#": "Problem description",
+        "#action#": "Firstly, when this incident is fired, the direct reason is the connectivity between NSM (primary replica, not backup replicas) and a particular RNM gateway instance, the health of RNM backend partitions (such as SviManager) is irrelevant. RNM is consist of several Service Fabric micro-services and running on Service Fabric clusters hosted by several fabric tenants in the same VNET. Each fabric tenant has its own VIP endpoint (typically one), which is registered to the A record of RNM DNS name. So, when we query `useast2euap.rnm.core.windows.net` in DNS a list of IP addresses will be returned.",
+        "#output#": "",
+        "#default_parameters#": {}
+    },
+    {
+        "#type#": "faq",
+        "#title#": "How to Investigate NSM to RNM Connection Incident",
+        "#intent#": "RNM Connection Heartbeat Dashboard",
+        "#action#": "When receiving this alert, open the dashboards link (NSM to RNM Connection) attached to the alert. Look at NSM to RNM heartbeat, change time range to last 1 hour: - If current counter is 0.5 and there is no data before now, this counter is just getting started, so it is false alert. Close the incident. - If current counter is 0.5, and there is gap when counter is 0, the incident is already mitigated. Change to sev-3, and assign to NSM team. - If counter is 0, check NM setting \"EnablePullApproachForRegionalResource\", - If setting is false, close the incident. - If setting is true, and there are many clusters reporting this alert in the region at the same time, keep severity at 2, and transfer to RNM queue. - If setting is true, and this is only cluster reporting the issue, keep the incident in NSM queue.",
+        "#output#": "",
+        "#default_parameters#": {}
+    },
+    {
+        "#type#": "faq",
+        "#title#": "How to Investigate NSM to RNM Connection Incident",
+        "#intent#": "NSM Settings and Traces",
+        "#action#": "Check the following NM settings:\n - RnmEndpointAddress\n- EnablePullApproachForRegionalResource\n\nCheck the following NSM traces https://jarvis-west.dc.ad.msft.net/7DEB1EC4. Change cluster name and time range as appropriate. \nUse the link provided in the IcM to determine a more specific cause of connectivity loss. An example of one of the exceptions that might be logged is\n```\n[83939827-c253-4272-b275-f0c0921c991a]:Exception while creating connection to useast2euap06.rnm.core.windows.net,Port:14000EndpointAuthenticationMetadata. Exception:There was no endpoint listening at http://useast2euap06.rnm.core.windows.net:14000/AuthenticationMetadata that could accept the message. This is often caused by an incorrect address or SOAP action. See InnerException, if present, for more details.\n```\nThe code executing the alive check can be found [here](https://msazure.visualstudio.com/One/_git/Networking-NSM?path=/src/nsm/RnmFacade/BaseNetworkManagerFacade.cs).",
+        "#output#": "",
+        "#default_parameters#": {}
+    },
+    {
+        "#type#": "steps",
+        "#title#": "How to Investigate NSM to RNM Connection Incident",
+        "#intent#": "How to Investigate NSM to RNM Connection Incident\nCheck Pull Task Execution From the Cluster. Check whether NSM can continue to pull from RNM over time in the last 8 hours.",
+        "#action#": "Firstly, we need to know the cluster name which can be obtained from the incident title, then use the following query to get the pull task count over time in the last 8 hours:\n\n```kusto\nlet startTime = ago(<START TIME>);\nlet endTime = now() - <END TIME>;\nlet clusterName = '<CLUSTER NAME>'; // use the cluster name here\ncluster('azurecm').database('AzureCM').DCMNMRegionalNetworkConfigurationQoSEtwTable\n| where PreciseTimeStamp between (startTime .. endTime) and Tenant == clusterName\n| where SequenceEvent == 'NetworkResourcePulled'\n| summarize cnt = count() by bin_at(PreciseTimeStamp, <BIN TIME>, datetime(0))\n```",
+        "#output#": "- If the above query result is always greater than zero, then consider the alert as false alarm.[MITIGATE]\n- If there are some zero values returned within the last one hour, and the most data with low values (less than 20), it means the customer traffic in the cluster is low. In this case, there is no action needed at this time, just keep observing for a longer period.[MITIGATE]\n- If the data values are zeros consistently in the last 30 minutes, then it is a real problem, proceed to next step: Check if Other Clusters In the Region are Impacted.[CONTINUE]\n- If none of above, continue to observe since NSM is pulling RNM just fine, the alert is a false alarm.[MITIGATE]",
+        "#default_parameters#": {
+            "<START TIME>": "8h",
+            "<END TIME>": "10m",
+            "<CLUSTER NAME>": "AM2PrdApp01",
+            "<BIN TIME>": "5m"
+        }
+    },
+    {
+        "#type#": "steps",
+        "#title#": "How to Investigate NSM to RNM Connection Incident",
+        "#intent#": "Check if Other Clusters In the Region are Impacted. A large region can have hundreds of fabric clusters. All of them share the same RNM regional service, which has much small number of VIP endpoints. If RNM server side is unhealthy, for instance certain VIP endpoint is unreachable, then NSM in multiple clusters can be impacted.",
+        "#action#": "To determine the list of affected clusters, the quickest way is to check IcM by running the following query to get the incidents in the last day:\n\n```kusto\nlet regionName = '<REGION_NAME>'; // use the region name from the incident title\nlet startTime = ago(<START_TIME>);\ncluster('icmcluster').database('IcMDataWarehouse').IncidentsSnapshotV2\n| where CreateDate > startTime and MonitorId == 'NsmToRnmConnectionV2'\n| where Title has regionName\n| project IncidentId, CreateDate, Title, MitigateDate, Status, RaisingDeviceName, OccurringDeviceName, OccurringEnvironment\n| top <TOP_NUMBER> by IncidentId desc\n```",
+        "#output#": "The query result is a list of incidents in the region.\n- If the incident count is one, follow the instructions at [Failover Cluster](../nsmcluster/Failover-Primary.md) to pick a new NSM primary and see if the symptom goes away (wait 15 to 30 minutes and run Step 1).[CROSS]\n- If the incident count is more than one, Check TCP Connectivity of All VIP Endpoints in RNM.[CONTINUE]",
+        "#default_parameters#": {
+            "<REGION_NAME>": "useast2euap",
+            "<START_TIME>": "1d",
+            "<TOP_NUMBER>": "100"
+        }
+    },
+    {
+        "#type#": "steps",
+        "#title#": "How to Investigate NSM to RNM Connection Incident",
+        "#intent#": "Check TCP Connectivity of All VIP Endpoints in RNM. If the server side issue is suspected, for instance certain VIPs are unreachable, we can check if they are reachable from SAW device or not. RNM VIPs are supposed to be reachable from both SAW device and FC nodes (where NSM is running). If any of them is unreachable, then this incident will be triggered in some clusters.",
+        "#action#": "To check the connectivity, use the following PowerShell script  by providing the Region Name obtained from the incident title to \"-RegionName\" argument:\n\nResolve-DnsName <DOMAIN_NAME>  | % { Test-NetConnection -Port <PORT_NUMBER> -ComputerName $_.IPAddress } | ft RemoteAddress, TcpTestSucceeded",
+        "#output#": "If all endpoints are reachable, the result will look like:\n\n```txt\nRemoteAddress TcpTestSucceeded\n------------- ----------------\n20.39.8.51                True\n20.39.8.15                True\n20.39.8.62                True\n20.39.8.3                 True\n20.39.8.43                True\n40.89.87.245              True\n40.89.103.244             True\n20.39.8.0                 True\n40.89.71.245              True\n20.39.8.1                 True\n```\n\nYou can try the command several times. The result should be consistent.\n\n-If any IP is \"False\" occasionally, focus on that to run the following command by replacing ip address with the value of RemoteAddress:\n\n```batch\n\"C:\\Program Files (x86)\\SysinternalsReducedSuite\\psping.exe\" -i 0 -t 20.39.8.1:15000 // RemoteAddress\n```.\n\nThe investigation steps above should tell us if the alert is real, and which VIPs might be unreachable.[MITIGATE] One can also obtain a list of VIP endpoints failing from NSM in the NsmTraces, then request assistance from RNM oncall (Cloudnet/RNM) to check the actual health of those endpoints/tenants from RNM's perspective.[MITIGATE]",
+        "#default_parameters#": {
+            "<DOMAIN_NAME>": "useast2euap.rnm.core.windows.net",
+            "<PORT_NUMBER>": "15000"
+        }
+    }
+]
