@@ -105,7 +105,7 @@ Note that we should add the below new lines in the configuration file `taskweave
 ## Nissit Demo Video
 A demo is also provided.
 
-https://github.com/AL-377/Nissist-Demo/.asset/Nissist-demo.mp4
+https://github.com/AL-377/Nissist-Demo/blob/master/.asset/Nisst-demo.mp4
 
 ## Citation
 
