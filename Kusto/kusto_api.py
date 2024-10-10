@@ -30,9 +30,14 @@ if 'KUSTO_LOGIN' in os.environ:
 else:
     KUSTO_LOGIN = config['KUSTO_LOGIN']
 
-general_kusto_provider = KustoDataProvider(KUSTO_CONNECTION, KUSTO_SECRET, KUSTO_AAD_APP_ID, KUSTO_AUTHORITY_ID, KUSTO_LOGIN)
-
+try:
+    general_kusto_provider = KustoDataProvider(KUSTO_CONNECTION, KUSTO_SECRET, KUSTO_AAD_APP_ID, KUSTO_AUTHORITY_ID, KUSTO_LOGIN)
+except Exception as e:
+    print(f"Failed to create KustoDataProvider: {e}")
+    general_kusto_provider = None
 def query_kusto_api(query):
+    if general_kusto_provider is None:
+        return None
     df = general_kusto_provider.query_dir(query)
     return df
 
