@@ -1,0 +1,70 @@
+[
+    {
+        "#type#": "terminology",
+        "#title#": "How to Investigate Service B to Service A Connection Incident",
+        "#intent#": "What is Service B to Service A connection?",
+        "#action#": "Service B, as a cluster-level service, maintains a pool of connections to Service A in the region for executing pull tasks (for instance, pull VNET, NIC, ACLs, etc.). In order to keep those connections alive and also for heartbeat purpose, Service B periodically sends an \"Echo\" request to Service A endpoint. Since the request simply returns a string without any involvement of the backend partition, it is supposed to work as long as the network connectivity from Service B to Service A gateway is alive. If the request fails, it indicates the connectivity does not work, and the pull task execution may be impacted, which could have direct customer impact. When the failure count reaches the predefined threshold, an incident will be created.",
+        "#output#": "",
+        "#default_parameters#": {}
+    },
+    {
+        "#type#": "background",
+        "#title#": "How to Investigate Service B to Service A Connection Incident",
+        "#intent#": "Problem description",
+        "#action#": "Firstly, when this incident is fired, the direct reason is the connectivity between Service B (primary replica, not backup replicas) and a particular Service A gateway instance. The health of Service B backend partitions (such as ABCManager) is irrelevant. Service B consists of several micro-services and runs on clusters hosted by several fabric tenants in the same VNET. Each fabric tenant has its own VIP endpoint (typically one), which is registered to the A record of Service A DNS name. So, when we query `mockurl.Service A.core.windows.net` in DNS, a list of IP addresses will be returned.",
+        "#output#": "",
+        "#default_parameters#": {}
+    },
+    {
+        "#type#": "faq",
+        "#title#": "How to Investigate Service B to Service A Connection Incident",
+        "#intent#": "Service A Connection Heartbeat Dashboard",
+        "#action#": "When receiving this alert, open the dashboards link (Service B to Service A Connection) attached to the alert. Look at Service B to Service A heartbeat and change the time range to the last hour: - If the current counter is 0.5 and there is no data before now, this counter is just getting started, so it is a false alert. Close the incident. - If the current counter is 0.5, and there is a gap when the counter is 0, the incident is already mitigated. Change to sev-3 and assign it to the Service A team. - If the counter is 0, check the Service B setting \"EnablePullApproachForRegionalResource\". - If the setting is false, close the incident. - If the setting is true, and there are many clusters reporting this alert in the region simultaneously, keep severity at 2 and transfer to the Service A queue. - If the setting is true, and this is the only cluster reporting the issue, keep the incident in the Service A queue.",
+        "#output#": "",
+        "#default_parameters#": {}
+    },
+    {
+        "#type#": "faq",
+        "#title#": "How to Investigate Service B to Service A Connection Incident",
+        "#intent#": "Service B Settings and Traces",
+        "#action#": "Check the following Service B settings:\n - Service AEndpointAddress\n- EnablePullApproachForRegionalResource\n\nCheck the following Service B traces at https://mockurl/7DEB1EC4. Change the cluster name and time range as appropriate.\nUse the link provided in the IcM to determine a more specific cause of connectivity loss. An example of one of the exceptions that might be logged is\n```\n[83939827-c253-4272-b275-f0c0921c991a]:Exception while creating connection to mockurl.Service A.core.windows.net,Port:14000EndpointAuthenticationMetadata. Exception:There was no endpoint listening at http://mockurl.Service A.core.windows.net:14000/AuthenticationMetadata that could accept the message. This is often caused by an incorrect address or SOAP action. See InnerException, if present, for more details.\n```\nThe code executing the alive check can be found [here](https://mockurl/Networking-A).",
+        "#output#": "",
+        "#default_parameters#": {}
+    },
+    {
+        "#type#": "steps",
+        "#title#": "How to Investigate Service B to Service A Connection Incident",
+        "#intent#": "How to Investigate Service B to Service A Connection Incident\nCheck Pull Task Execution From the Cluster. Check whether Service B can continue to pull from Service A over time in the last 8 hours.",
+        "#action#": "Firstly, we need to know the cluster name which can be obtained from the incident title, then use the following query to get the pull task count over time in the last 8 hours:\n\n```kusto\nlet startTime = ago(<START TIME>);\nlet endTime = now() - <END TIME>;\nlet clusterName = '<CLUSTER NAME>'; // use the cluster name here\ncluster('azurecm').database('AzureCM').DCMNMRegionalNetworkConfigurationQoSEtwTable\n| where PreciseTimeStamp between (startTime .. endTime) and Tenant == clusterName\n| where SequenceEvent == 'NetworkResourcePulled'\n| summarize cnt = count() by bin_at(PreciseTimeStamp, <BIN TIME>, datetime(0))\n```",
+        "#output#": "- If the above query result is always greater than zero, then consider the alert as a false alarm.[MITIGATE]\n- If there are some zero values returned within the last hour, and most data has low values (less than 20), it means the customer traffic in the cluster is low. In this case, there is no action needed at this time, just keep observing for a longer period.[MITIGATE]\n- If the data values are zeros consistently in the last 30 minutes, then it is a real problem. Proceed to the next step: Check if Other Clusters In the Region are Impacted.[CONTINUE]\n- If none of the above, continue to observe since Service B is pulling from Service A just fine; the alert is a false alarm.[MITIGATE]",
+        "#default_parameters#": {
+            "<START TIME>": "8h",
+            "<END TIME>": "10m",
+            "<CLUSTER NAME>": "cluster_name",
+            "<BIN TIME>": "5m"
+        }
+    },
+    {
+        "#type#": "steps",
+        "#title#": "How to Investigate Service B to Service A Connection Incident",
+        "#intent#": "Check if Other Clusters In the Region are Impacted. A large region can have hundreds of fabric clusters. All of them share the same Service A regional service, which has a much smaller number of VIP endpoints. If Service A server side is unhealthy, for instance, certain VIP endpoints are unreachable, then Service A in multiple clusters can be impacted.",
+        "#action#": "To determine the list of affected clusters, the quickest way is to check IcM by running the following query to get the incidents in the last day:\n\n```kusto\nlet regionName = '<REGION_NAME>'; // use the region name from the incident title\nlet startTime = ago(<START_TIME>);\ncluster('a_cluster').database('ADataWarehouse').ASnapshotV2\n| where CreateDate > startTime and MonitorId == 'BConnectionV2'\n| where Title has regionName\n| project IncidentId, CreateDate, Title, MitigateDate, Status, RaisingDeviceName, OccurringDeviceName, OccurringEnvironment\n| top <TOP_NUMBER> by IncidentId desc\n```",
+        "#output#": "The query result is a list of incidents in the region.\n- If the incident count is one, follow the instructions at [Failover Cluster](../abcdcluster/Failover-Primary.md) to pick a new Service B primary and see if the symptom goes away (wait 15 to 30 minutes and run Step 1).[CROSS]\n- If the incident count is more than one, Check TCP Connectivity of All VIP Endpoints in Service A.[CONTINUE]",
+        "#default_parameters#": {
+            "<REGION_NAME>": "mockregion",
+            "<START_TIME>": "1d",
+            "<TOP_NUMBER>": "100"
+        }
+    },
+    {
+        "#type#": "steps",
+        "#title#": "How to Investigate Service B to Service A Connection Incident",
+        "#intent#": "Check TCP Connectivity of All VIP Endpoints in Service A. If the server side issue is suspected, for instance, certain VIPs are unreachable, we can check if they are reachable from a SAW device or not. Service A VIPs are supposed to be reachable from both the SAW device and FC nodes (where Service B is running). If any of them is unreachable, then this incident will be triggered in some clusters.",
+        "#action#": "To check the connectivity, use the following PowerShell script by providing the Region Name obtained from the incident title to the \"-RegionName\" argument:\n\nResolve-DnsName <DOMAIN_NAME>  | % { Test-NetConnection -Port <PORT_NUMBER> -ComputerName $_.IPAddress } | ft RemoteAddress, TcpTestSucceeded",
+        "#output#": "",
+        "#default_parameters#": {
+            "<DOMAIN_NAME>": "mockurl.Service A.core.windows.net",
+            "<PORT_NUMBER>": "14000"
+        }
+    }
+]

@@ -5,6 +5,8 @@ This repository contains the offical implementations of our paper [Nissist: An I
 
 We are honored to be accepted by ECAI 2024 Demo Track.
 
+
+
 ## Nissist Setup
 
 1. Create virtual environment
@@ -99,6 +101,11 @@ Note that we should add the below new lines in the configuration file `taskweave
 "execution_service.kernel_mode": "local"
 }
 ```
+
+## Nissit Demo Video
+A demo is also provided.
+
+https://github.com/AL-377/Nissist-Demo/.asset/Nissist-demo.mp4
 
 ## Citation
 

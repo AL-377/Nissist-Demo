@@ -1,0 +1,42 @@
+[
+    {
+        "#type#": "background",
+        "#title#": "Failover Cluster",
+        "#intent#": "What is the background of failover cluster?",
+        "#action#": "Only one replica in the cluster is primary at any given time for A_. This is the replica that is actively running A_ and processing all requests. However, the primary may be memory exhausted, threads hung, or something else that is preventing A_ from working properly. In this case sometimes the quickest way to resolve an issue will be to failover the primary to another replica. Note: This usually is a temporary mitigation as the underlying problem will still most likely be there. However, it can buy time for an investigation. Please consider capturing a crash dump of A_ process for further investigation before starting the failover for mitigation.",
+        "#output#": "",
+        "#default_parameters#": {}
+    },
+    {
+        "#type#": "steps",
+        "#title#": "Failover Cluster",
+        "#intent#": "Failover Cluster\nMethod No. 1 - OaaS to failover (Recommended). Resolve issues that the A_ primiary goes wrong, and Use Oaas to pick a new primary.",
+        "#action#": "See [OaaS Documentation](https://eng.ms/docs/cloud-ai-platform/azure-core/azure-networking/sdn-dbansal/network-service-manager/network-service-manager/tools/oaas) for more info.\n\nList the clusters in mitigationtargets.json file you wish to failover.\n\nExample mitigationtargets.json:\n```json\n{\n    \"TargetType\": \"<TARGET_TYPE>\",\n    \"TargetId\": \"<TARGET_ID>\",\n    \"TargetMetadata\": { \"ClusterName\": \"<CLUSTER_NAME>\" }\n}\n```\nRun OaaS OneAccess.Exe:\n\nOneAccess.exe /VePath:orchestrationpolicy\\Oaas\\VirtualEnvironments\\NetworkManager\\FailoverA_ /bId:199437607 /OverrideTargetsFilePath:mitigationtargets.json",
+        "#output#": "- If it works, then the incident is mitigated.[MITIGATE]\n- If not, then try to use FCShell method.[CONTINUE]",
+        "#default_parameters#": {
+            "<TARGET_TYPE>": "Cluster",
+            "<TARGET_ID>": "target_id",
+            "<CLUSTER_NAME>": "cluster_name"
+        }
+    },
+    {
+        "#type#": "steps",
+        "#title#": "Failover Cluster",
+        "#intent#": "Method No. 2 - FCShell method (use only if OaaS fails). Use FCShell to realize failover cluster.",
+        "#action#": "```kusto\n# Get cluster\n$f = Get-Fabric <CLUSTER_NAME>\n\n# Request Jit access\nGet-JitAccess -bIncidentId <INCIDENT_ID> -Justification \"<JUSTIFICATION>\" -Environment product -ResourceType FFEs -Clusters $f.Name -FfeAccessLevel PlatformAdministrator\n\n# Note current primary\n$f.A_\n\n# Failover replica\n$f | Invoke-FclApi A_StorageClusterManagementService FailoverReplica @();\n\n# Verify failover by seeing primary has changed.\n$f.A_\n```",
+        "#output#": "- If it works, then the incident is mitigated.[MITIGATE]\n- If not, then try to use Block traffic from majority of replicas method.[CONTINUE]",
+        "#default_parameters#": {
+            "<CLUSTER_NAME>": "cluster_name",
+            "<INCIDENT_ID>": "incident_id",
+            "<JUSTIFICATION>": "Failover Service A"
+        }
+    },
+    {
+        "#type#": "steps",
+        "#title#": "Failover Cluster",
+        "#intent#": "Method No. 3 - Block traffic from majority of replicas (use only when the above methods don't work). Use Block traffic from majority of replicas to realize failover cluster.",
+        "#action#": "- Identify the current primary and confirm it cannot be RDPed into and does not respond to any other network requests.\n- RDP into every other nodes (6 backup replicas).\n  - Open Advanced Windows Firewall settings and add an outbound rule to block the TCP traffic to the primary by IP address, port 14004-14006. The port numbers are configured in src\\A_\\A_\\App.config.\n  - At this moment, new connections will be blocked. Then kill NetworkServiceManager.exe process. Wait until the process is stabilized.\n  - Repeat above two steps in the next node. Once the majority of the backup replica nodes are finished, the primary replica will relinquish the primary status and terminate the process on its own.\n- Wait until both cluster health snapshot and MR signal indicate the old primary is disconnected from RSL ring in noncontactable state, and all other replicas are healthy and connected to RSL ring.\n  - Check the primary uptime is good.\n- Cleanup: RDP into the previously accessed nodes and delete the added windows firewall rule. No need to kill A_ process.\n- Ask CLIP team to repair the node at where the previous primary is located.",
+        "#output#": "- If it works, then the incident is mitigated.[MITIGATE]\n- If not, then try to get connect with oncall engineers.[MITIGATE]",
+        "#default_parameters#": {}
+    }
+]
