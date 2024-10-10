@@ -1,5 +1,5 @@
-AOAI_TYPE: 'azure'
-AOAI_BASE: 'YOUR_AOAI_BASE, e.g., https://**.openai.azure.com/'
+AOAI_TYPE: 'azure' # 'openai' or 'azure'
+AOAI_BASE: 'YOUR_AOAI_BASE, e.g., https://**.openai.azure.com/' # if AOAI_TYPE is 'openai', it should be 'https://api.openai.com/v1/'
 AOAI_VERSION: 'YOUR_AOAI_VERVISON, e.g., 2023-12-01-preview'
 AOAI_KEY: 'YOUR_AOAI_KEY'
 AOAI_ENGINE: 'YOUR_DEPLOYED_MODEL_NAME'
