@@ -106,15 +106,27 @@ else:
         },
     ]
 
-config_list = [
-    {
-        'model': api_model,
-        'api_key': api_key,
-        'base_url': api_base,
-        'api_type': api_type,
-        'api_version': api_version,
-    },
-]
+
+if api_type and api_type.startswith("azure"):
+
+    config_list = [
+        {
+            'model': api_model,
+            'api_key': api_key,
+            'base_url': api_base,
+            'api_type': api_type,
+            'api_version': api_version,
+        },
+    ]
+else:
+    config_list = [
+        {
+            'model': api_model,
+            'api_key': api_key,
+            'base_url': api_base,
+            'api_version': api_version,
+        },
+    ]
 
 llm_config={
         "timeout": 600,
